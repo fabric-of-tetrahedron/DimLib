@@ -44,7 +44,7 @@ public class MixinBackupConfirmScreen extends Screen {
     @SuppressWarnings("JavadocReference")
     @Inject(method = "<init>", at = @At("RETURN"))
     private void onInitEnd(
-        Runnable runnable, BackupConfirmScreen.Listener listener,
+        Screen screen, BackupConfirmScreen.Listener listener,
         Component component, Component component2, boolean bl, CallbackInfo ci
     ) {
         dimlib_isExperimentalWarning = Objects.equals(
