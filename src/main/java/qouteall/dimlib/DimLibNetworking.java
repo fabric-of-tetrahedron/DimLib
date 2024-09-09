@@ -4,16 +4,14 @@ import com.google.common.collect.ImmutableMap;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -22,7 +20,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.apache.commons.lang3.Validate;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qouteall.dimlib.api.DimensionAPI;
@@ -31,15 +28,15 @@ import qouteall.dimlib.mixin.client.IClientPacketListener;
 public class DimLibNetworking {
     public static final Logger LOGGER = LoggerFactory.getLogger(DimLibNetworking.class);
     
-    public static record DimSyncPacket(
-        CompoundTag dimIdToTypeIdTag
-    ) implements CustomPacketPayload {
-        public static final CustomPacketPayload.Type<DimSyncPacket> TYPE =
-            new Type<>(ResourceLocation.parse("dimlib:dim_sync"));
-        
-        public static final StreamCodec<FriendlyByteBuf, DimSyncPacket> CODEC =
-            StreamCodec.of((b, p) -> p.write(b), DimSyncPacket::read);
-        
+    public static final ResourceLocation DIM_SYNC_ID = new ResourceLocation("dimlib:dim_sync");
+
+    public static class DimSyncPacket {
+        private final CompoundTag dimIdToTypeIdTag;
+
+        public DimSyncPacket(CompoundTag dimIdToTypeIdTag) {
+            this.dimIdToTypeIdTag = dimIdToTypeIdTag;
+        }
+
         public static DimSyncPacket read(FriendlyByteBuf buf) {
             CompoundTag compoundTag = buf.readNbt();
             return new DimSyncPacket(compoundTag);
@@ -52,7 +49,7 @@ public class DimLibNetworking {
         public static DimSyncPacket createPacket(MinecraftServer server) {
             RegistryAccess registryManager = server.registryAccess();
             Registry<DimensionType> dimensionTypes = registryManager.registryOrThrow(Registries.DIMENSION_TYPE);
-            
+
             CompoundTag dimIdToDimTypeId = new CompoundTag();
             for (ServerLevel world : server.getAllLevels()) {
                 ResourceKey<Level> dimId = world.dimension();
@@ -78,20 +75,20 @@ public class DimLibNetworking {
         }
         
         public ImmutableMap<ResourceKey<Level>, ResourceKey<DimensionType>> toMap() {
-            CompoundTag tag = dimIdToTypeIdTag();
-            
+            CompoundTag tag = dimIdToTypeIdTag;
+
             ImmutableMap.Builder<ResourceKey<Level>, ResourceKey<DimensionType>> builder =
                 new ImmutableMap.Builder<>();
             
             for (String key : tag.getAllKeys()) {
                 ResourceKey<Level> dimId = ResourceKey.create(
                     Registries.DIMENSION,
-                    ResourceLocation.parse(key)
+                    new ResourceLocation(key)
                 );
                 String dimTypeId = tag.getString(key);
                 ResourceKey<DimensionType> dimType = ResourceKey.create(
                     Registries.DIMENSION_TYPE,
-                    ResourceLocation.parse(dimTypeId)
+                    new ResourceLocation(dimTypeId)
                 );
                 builder.put(dimId, dimType);
             }
@@ -100,9 +97,9 @@ public class DimLibNetworking {
         }
         
         @Environment(EnvType.CLIENT)
-        public void handle(ClientGamePacketListener listener) {
+        public void handle(Minecraft client) {
             Validate.isTrue(
-                Minecraft.getInstance().isSameThread(),
+                client.isSameThread(),
                 "Not running in client thread"
             );
             
@@ -113,34 +110,37 @@ public class DimLibNetworking {
             
             var dimIdToDimType = this.toMap();
             ClientDimensionInfo.accept(dimIdToDimType);
-            ((IClientPacketListener) listener).ip_setLevels(dimIdToDimType.keySet());
-            
+            ((IClientPacketListener) client.getConnection()).ip_setLevels(dimIdToDimType.keySet());
+
             DimensionAPI.CLIENT_DIMENSION_UPDATE_EVENT.invoker().run(
                 ClientDimensionInfo.getDimensionIds()
             );
         }
-        
-        @Override
-        public @NotNull Type<? extends CustomPacketPayload> type() {
-            return TYPE;
-        }
     }
     
     public static void init() {
-        PayloadTypeRegistry.playS2C().register(
-            DimSyncPacket.TYPE, DimSyncPacket.CODEC
-        );
+        ServerPlayNetworking.registerGlobalReceiver(DIM_SYNC_ID, (server, player, handler, buf, responseSender) -> {
+            DimSyncPacket packet = DimSyncPacket.read(buf);
+            server.execute(() -> {
+                // Handle packet on server side if needed
+            });
+        });
     }
     
-    @SuppressWarnings("resource")
     @Environment(EnvType.CLIENT)
     public static void initClient() {
-        ClientPlayNetworking.registerGlobalReceiver(
-            DimSyncPacket.TYPE,
-            (p, c) -> {
-                // it's now handled in client thread, not networking thread
-                p.handle(c.client().getConnection());
-            }
+        ClientPlayNetworking.registerGlobalReceiver(DIM_SYNC_ID, (client, handler, buf, responseSender) -> {
+            DimSyncPacket packet = DimSyncPacket.read(buf);
+            client.execute(() -> packet.handle(client));
+        });
+    }
+
+    public static void sendDimSyncPacket(MinecraftServer server) {
+        DimSyncPacket packet = DimSyncPacket.createPacket(server);
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        packet.write(buf);
+        server.getPlayerList().getPlayers().forEach(player ->
+            ServerPlayNetworking.send(player, DIM_SYNC_ID, buf)
         );
     }
 }

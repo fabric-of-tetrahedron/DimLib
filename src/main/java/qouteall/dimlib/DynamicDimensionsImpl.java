@@ -1,18 +1,17 @@
 package qouteall.dimlib;
 
+import net.minecraft.world.level.chunk.ChunkStatus;
 import com.google.common.collect.ImmutableList;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.Lifecycle;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.MappedRegistry;
-import net.minecraft.core.RegistrationInfo;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.common.ClientCommonPacketListener;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -24,7 +23,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.border.BorderChangeListener;
 import net.minecraft.world.level.border.WorldBorder;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.levelgen.WorldOptions;
@@ -116,7 +114,7 @@ public class DynamicDimensionsImpl {
         ((MappedRegistry<LevelStem>) levelStemRegistry).register(
             ResourceKey.create(Registries.LEVEL_STEM, dimensionId),
             levelStem,
-            RegistrationInfo.BUILT_IN // use built-in registration info for now
+            Lifecycle.stable() // use built-in registration info for now
         );
         ((IMappedRegistry) levelStemRegistry).dimlib_setIsFrozen(true);
         

@@ -3,7 +3,6 @@ package qouteall.dimlib.mixin.common;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.Connection;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.players.PlayerList;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -24,7 +23,6 @@ public class MixinPlayerList {
     private void onConnectionEstablished(
         Connection connection,
         ServerPlayer player,
-        CommonListenerCookie commonListenerCookie,
         CallbackInfo ci
     ) {
         player.connection.send(
