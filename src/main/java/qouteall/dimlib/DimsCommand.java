@@ -173,7 +173,7 @@ public class DimsCommand {
     ) {
         ResourceLocation newDimId;
         try {
-            newDimId = ResourceLocation.parse(newDimensionId);
+            newDimId = ResourceLocation.tryParse(newDimensionId);
         }
         catch (Exception e) {
             context.getSource().sendFailure(Component.literal("Invalid dimension id"));

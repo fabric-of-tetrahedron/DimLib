@@ -50,7 +50,7 @@ public class DimLibUtil {
         ) throws JsonParseException {
             String str = json.getAsString();
             return ResourceKey.create(
-                Registries.DIMENSION, ResourceLocation.parse(str)
+                Registries.DIMENSION, ResourceLocation.tryParse(str)
             );
         }
         

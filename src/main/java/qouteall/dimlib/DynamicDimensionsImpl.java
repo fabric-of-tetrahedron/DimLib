@@ -1,5 +1,7 @@
 package qouteall.dimlib;
 
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import com.google.common.collect.ImmutableList;
 import com.mojang.serialization.DynamicOps;
@@ -33,6 +35,7 @@ import org.apache.commons.lang3.Validate;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
+import qouteall.dimlib.DimLibNetworking.DimSyncPacket;
 import qouteall.dimlib.api.DimensionAPI;
 import qouteall.dimlib.ducks.IMappedRegistry;
 import qouteall.dimlib.ducks.IMinecraftServer;
@@ -122,13 +125,13 @@ public class DynamicDimensionsImpl {
         
         LOGGER.info("Added Dimension {}", dimensionId);
         
-        var dimSyncPacket = ServerPlayNetworking.createS2CPacket(
-            DimLibNetworking.DimSyncPacket.createPacket(server)
-        );
+        DimSyncPacket packet = DimSyncPacket.createPacket(server);
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        packet.write(buf);
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            player.connection.send(dimSyncPacket);
+            ServerPlayNetworking.send(player, DimLibNetworking.DIM_SYNC_ID, buf);
         }
-        
+
         DimensionAPI.SERVER_DIMENSION_DYNAMIC_UPDATE_EVENT.invoker().run(server, server.levelKeys());
     }
     
@@ -216,13 +219,13 @@ public class DynamicDimensionsImpl {
             
             LOGGER.info("Removed Dimension {}", dimension.location());
             
-            Packet<ClientCommonPacketListener> dimSyncPacket = ServerPlayNetworking.createS2CPacket(
-                DimLibNetworking.DimSyncPacket.createPacket(server)
-            );
+            DimSyncPacket packet = DimSyncPacket.createPacket(server);
+            FriendlyByteBuf buf = PacketByteBufs.create();
+            packet.write(buf);
             for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-                player.connection.send(dimSyncPacket);
+                ServerPlayNetworking.send(player, DimLibNetworking.DIM_SYNC_ID, buf);
             }
-            
+
             DimensionAPI.SERVER_DIMENSION_DYNAMIC_UPDATE_EVENT.invoker().run(server, server.levelKeys());
         });
     }

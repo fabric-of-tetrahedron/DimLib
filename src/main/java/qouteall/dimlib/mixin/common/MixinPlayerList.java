@@ -1,7 +1,9 @@
 package qouteall.dimlib.mixin.common;
 
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.Connection;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import org.spongepowered.asm.mixin.Mixin;
@@ -9,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import qouteall.dimlib.DimLibNetworking;
+import qouteall.dimlib.DimLibNetworking.DimSyncPacket;
 
 @Mixin(PlayerList.class)
 public class MixinPlayerList {
@@ -25,10 +28,9 @@ public class MixinPlayerList {
         ServerPlayer player,
         CallbackInfo ci
     ) {
-        player.connection.send(
-            ServerPlayNetworking.createS2CPacket(
-                DimLibNetworking.DimSyncPacket.createPacket(player.server)
-            )
-        );
+        DimSyncPacket packet = DimSyncPacket.createPacket(player.server);
+        FriendlyByteBuf buf = PacketByteBufs.create();
+        packet.write(buf);
+        ServerPlayNetworking.send(player, DimLibNetworking.DIM_SYNC_ID, buf);
     }
 }
